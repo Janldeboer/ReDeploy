@@ -1,6 +1,16 @@
 from flask import Flask, request, render_template, redirect, url_for, send_from_directory
 import os
 import subprocess
+import logging
+
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler('app.log'),
+                        logging.StreamHandler()
+                    ])
+
+logger = logging.getLogger(__name__)
 
 port = int(os.environ.get('PORT', 5001))
 
@@ -66,10 +76,13 @@ def concatenate_files_content(dir_path):
     for root, dirs, files in os.walk(dir_path):
         for file in files:
             file_path = os.path.join(root, file)
-            with open(file_path, 'r') as f:
-                content = f.read()
-            file_rel_path = os.path.relpath(file_path, dir_path)
-            concatenated_content.append(f'```{file_rel_path}\n{content}\n```\n')
+            try: 
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                file_rel_path = os.path.relpath(file_path, dir_path)
+                concatenated_content.append(f'```{file_rel_path}\n{content}\n```\n')
+            except Exception as e:
+                logger.error(f'Error reading file {file_path}: {e}')
     return '\n'.join(concatenated_content)
 
 def main():
