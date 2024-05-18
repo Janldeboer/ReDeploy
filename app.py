@@ -48,6 +48,7 @@ def call_openai_api(prompt):
         return completion.choices[0].text.strip()
     except Exception as e:
         logger.error(f'Error calling OpenAI API: {e}')
+        logger.error(f'Completion attributes: {completion.model_dump()}')
         return "No changes"
 
 def apply_answer_to_git(answer):
