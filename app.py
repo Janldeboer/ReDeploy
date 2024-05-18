@@ -58,6 +58,7 @@ def apply_answer_to_git(answer):
             file.write(new_content)
     subprocess.run(['git', '-C', CLONE_DIR, 'add', '.'])
     subprocess.run(['git', '-C', CLONE_DIR, 'commit', '-m', 'Applied changes from OpenAI API'])
+    subprocess.run(['git', '-C', CLONE_DIR, 'push'])
 
 def retrieve_file_changes(answer):
     changes = {}
@@ -142,6 +143,6 @@ def main():
         subprocess.run(['git', 'clone', REPO_URL, CLONE_DIR])
     
     app.run(host='0.0.0.0', port=port)
-    
+
 if __name__ == '__main__':
     main()
