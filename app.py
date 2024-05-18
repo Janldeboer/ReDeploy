@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, redirect, url_for, send_from_
 import os
 import subprocess
 import logging
+from base64 import b64decode
 from openai import OpenAI
 
 logging.basicConfig(level=logging.INFO, 
@@ -80,6 +81,23 @@ def retrieve_file_changes(answer):
     
     return changes
 
+def setup_ssh_key():
+    # Decode the base64 private key
+    private_key = b64decode(os.environ['GIT_PRIVATE_KEY']).decode('utf-8')
+    
+    # Write the private key to a file
+    ssh_dir = os.path.expanduser('~/.ssh')
+    os.makedirs(ssh_dir, exist_ok=True)
+    key_path = os.path.join(ssh_dir, 'id_rsa')
+    with open(key_path, 'w') as key_file:
+        key_file.write(private_key)
+    
+    # Secure the key file
+    os.chmod(key_path, 0o600)
+    
+    # Start the SSH agent and add the private key
+    subprocess.run(['ssh-agent', '-s'], check=True)
+    subprocess.run(['ssh-add', key_path], check=True)
 
 @app.route('/')
 def index():
@@ -135,7 +153,7 @@ def concatenate_files_content(dir_path):
     return '\n'.join(concatenated_content)
 
 def main():
-    subprocess.run(['git', 'config', '--global', 'user.email', 'you@example.com'])
+    subprocess.run(['git', 'config', '--global', 'user.email', '44832123+Janldeboer@users.noreply.github.com'])
     subprocess.run(['git', 'config', '--global', 'user.name', 'Jan de Boer (AI)'])
     
     if not os.path.exists(CLONE_DIR):
@@ -145,4 +163,5 @@ def main():
     app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
+    setup_ssh_key()
     main()
