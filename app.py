@@ -9,6 +9,23 @@ app = Flask(__name__)
 REPO_URL = 'https://github.com/Janldeboer/ReDeploy'
 CLONE_DIR = 'cloned_repo'
 
+prompt_template = """You are a software developer, improving a web app by executing new requests.
+
+Below, you find a prompt of code changes and the available files, in code blocks, e.g.
+```topfolder/subdir/file.py
+# code may be here
+```
+One code block per file, with the filename in the header.
+To change files, answer with code blocks in the same format.
+Make sure to use the correct file names and folders and not to leave any placeholders in the code, as it will be deployed as is.
+
+
+Prompt:
+"{prompt}"
+
+Code:
+{code}"""
+
 
 @app.route('/')
 def index():
