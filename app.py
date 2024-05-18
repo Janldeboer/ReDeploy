@@ -95,9 +95,22 @@ def setup_ssh_key():
     # Secure the key file
     os.chmod(key_path, 0o600)
     
-    # Start the SSH agent and add the private key
-    subprocess.run(['ssh-agent', '-s'], check=True)
-    subprocess.run(['ssh-add', key_path], check=True)
+    # Start the SSH agent
+    agent_process = subprocess.run(['ssh-agent', '-s'], check=True, text=True, capture_output=True)
+    
+    # Extract and set SSH_AUTH_SOCK and SSH_AGENT_PID from the ssh-agent output
+    agent_output = agent_process.stdout
+    for line in agent_output.splitlines():
+        if line.startswith('SSH_AUTH_SOCK'):
+            os.environ['SSH_AUTH_SOCK'] = line.split('=')[1].strip(' ;')
+        elif line.startswith('SSH_AGENT_PID'):
+            os.environ['SSH_AGENT_PID'] = line.split('=')[1].strip(' ;')
+
+    try:
+        # Add the private key to the agent
+        subprocess.run(['ssh-add', key_path], check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f'Error adding SSH key to agent: {e}')
 
 @app.route('/')
 def index():
@@ -153,6 +166,7 @@ def concatenate_files_content(dir_path):
     return '\n'.join(concatenated_content)
 
 def main():
+    setup_ssh_key()
     subprocess.run(['git', 'config', '--global', 'user.email', '44832123+Janldeboer@users.noreply.github.com'])
     subprocess.run(['git', 'config', '--global', 'user.name', 'Jan de Boer (AI)'])
     
@@ -163,5 +177,4 @@ def main():
     app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
-    setup_ssh_key()
     main()
