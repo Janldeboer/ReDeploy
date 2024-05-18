@@ -134,8 +134,14 @@ def concatenate_files_content(dir_path):
     return '\n'.join(concatenated_content)
 
 def main():
+    subprocess.run(['git', 'config', '--global', 'user.email', 'you@example.com'])
+    subprocess.run(['git', 'config', '--global', 'user.name', 'Jan de Boer (AI)'])
+    
+    if not os.path.exists(CLONE_DIR):
+        os.makedirs(CLONE_DIR, exist_ok=True)
+        subprocess.run(['git', 'clone', REPO_URL, CLONE_DIR])
+    
     app.run(host='0.0.0.0', port=port)
-
-
+    
 if __name__ == '__main__':
     main()
