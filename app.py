@@ -52,20 +52,14 @@ def view_repo():
     if not os.path.exists(CLONE_DIR):
         return "Repository not cloned yet. Please fetch the repository first."
     
-    files = get_all_files(CLONE_DIR)
-    return render_template('view_repo.html', files=files)
+    files = os.listdir(CLONE_DIR)
+    combined = concatenate_files_content(CLONE_DIR)
+    return render_template('view_repo.html', files=files, combined=combined)
 
 
 @app.route('/cloned_repo/<path:filename>')
 def serve_file(filename):
     return send_from_directory(CLONE_DIR, filename)
-
-def get_all_files(dir_path):
-    all_files = []
-    for root, dirs, files in os.walk(dir_path):
-        for file in files:
-            all_files.append(os.path.relpath(os.path.join(root, file), dir_path))
-            return all_files
 
 def concatenate_files_content(dir_path):
     concatenated_content = []
@@ -74,8 +68,8 @@ def concatenate_files_content(dir_path):
             file_path = os.path.join(root, file)
             with open(file_path, 'r') as f:
                 content = f.read()
-                file_rel_path = os.path.relpath(file_path, dir_path)
-                concatenated_content.append(f'```{file_rel_path}\n{content}\n```\n')
+            file_rel_path = os.path.relpath(file_path, dir_path)
+            concatenated_content.append(f'```{file_rel_path}\n{content}\n```\n')
     return '\n'.join(concatenated_content)
 
 def main():
