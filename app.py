@@ -40,11 +40,15 @@ Code:
 {code}"""
 
 def call_openai_api(prompt):
-    completion = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return completion.choices[0].text.strip()
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return completion.choices[0].text.strip()
+    except Exception as e:
+        logger.error(f'Error calling OpenAI API: {e}')
+        return "No changes"
 
 def apply_answer_to_git(answer):
     changes = retrieve_file_changes(answer)
