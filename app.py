@@ -38,7 +38,8 @@ Below, you find a prompt of code changes and the available files, in code blocks
 One code block per file, with the filename in the header.
 To change files, answer with code blocks in the same format.
 Make sure to use the correct file names and folders and not to leave any placeholders in the code, as it will be deployed as is.
-
+Don't make additional changes to the code, only the changes requested in the prompt.
+If you can't make the requested changes, don't make any changes.
 
 Prompt:
 "{prompt}"
@@ -49,14 +50,17 @@ Code:
 def call_openai_api(prompt):
     try:
         completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
-        return completion.choices[0].message.content
+        answer = completion.choices[0].message.content
+        logger.info(f'Answer from OpenAI: {answer}')
+        return answer
     except Exception as e:
         logger.error(f'Error calling OpenAI API: {e}')
         logger.error(f'Completion attributes: {completion.model_dump()}')
         return "No changes"
+    
 def apply_answer_to_git(answer):
     changes = retrieve_file_changes(answer)
     for file_path, new_content in changes.items():
