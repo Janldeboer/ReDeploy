@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, redirect, url_for, send_from_
 import os
 import subprocess
 import logging
+from openai import OpenAI
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -13,6 +14,8 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 port = int(os.environ.get('PORT', 5001))
+
+openai = OpenAI()
 
 app = Flask(__name__)
 
@@ -36,6 +39,41 @@ Prompt:
 Code:
 {code}"""
 
+def call_openai_api(prompt):
+    completion = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return completion.choices[0].text.strip()
+
+def apply_answer_to_git(answer):
+    changes = retrieve_file_changes(answer)
+    for file_path, new_content in changes.items():
+        with open(os.path.join(CLONE_DIR, file_path), 'w') as file:
+            file.write(new_content)
+    subprocess.run(['git', '-C', CLONE_DIR, 'add', '.'])
+    subprocess.run(['git', '-C', CLONE_DIR, 'commit', '-m', 'Applied changes from OpenAI API'])
+
+def retrieve_file_changes(answer):
+    changes = {}
+    lines = answer.split('\n')
+    file_path = None
+    content = []
+    in_code_block = False
+    
+    for line in lines:
+        if line.startswith('```') and not in_code_block:
+            in_code_block = True
+            file_path = line[3:].strip()
+            content = []
+        elif line.startswith('```') and in_code_block:
+            in_code_block = False
+            changes[file_path] = '\n'.join(content)
+        elif in_code_block:
+            content.append(line)
+    
+    return changes
+
 
 @app.route('/')
 def index():
@@ -44,8 +82,11 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    prompt = request.form['prompt']
-    # Process the prompt (this will be more complex later)
+    user_prompt = request.form['prompt']
+    code = concatenate_files_content(CLONE_DIR)
+    prompt = prompt_template.format(prompt=user_prompt, code=code)
+    answer = call_openai_api(prompt)
+    apply_answer_to_git(answer)
     return redirect(url_for('index'))
 
 
@@ -74,8 +115,10 @@ def serve_file(filename):
 def concatenate_files_content(dir_path):
     concatenated_content = []
     for root, dirs, files in os.walk(dir_path):
-        for file in files:
-            file_path = os.path.join(root, file)
+        for _file in files:
+            if _file.startswith('.'):
+                continue
+            file_path = os.path.join(root, _file)
             try: 
                 with open(file_path, 'r') as f:
                     content = f.read()
