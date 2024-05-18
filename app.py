@@ -42,10 +42,10 @@ Code:
 def call_openai_api(prompt):
     try:
         completion = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        return completion.choices[0].text.strip()
+        return completion.choices[0].message.content
     except Exception as e:
         logger.error(f'Error calling OpenAI API: {e}')
         logger.error(f'Completion attributes: {completion.model_dump()}')
