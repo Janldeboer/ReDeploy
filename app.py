@@ -1,9 +1,17 @@
 from flask import Flask, request, render_template, redirect, url_for, send_from_directory
 import os
 import subprocess
+import requests
 import logging
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from openai import OpenAI
+
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+GITHUB_REPO = 'Janldeboer/ReDeploy'
+GITHUB_BRANCH = 'main'
+
+REPO_URL = 'https://github.com/Janldeboer/ReDeploy'
+CLONE_DIR = 'cloned_repo'
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -20,8 +28,6 @@ openai = OpenAI()
 
 app = Flask(__name__)
 
-REPO_URL = 'https://github.com/Janldeboer/ReDeploy'
-CLONE_DIR = 'cloned_repo'
 
 prompt_template = """You are a software developer, improving a web app by executing new requests.
 
@@ -51,15 +57,37 @@ def call_openai_api(prompt):
         logger.error(f'Error calling OpenAI API: {e}')
         logger.error(f'Completion attributes: {completion.model_dump()}')
         return "No changes"
-
 def apply_answer_to_git(answer):
     changes = retrieve_file_changes(answer)
     for file_path, new_content in changes.items():
-        with open(os.path.join(CLONE_DIR, file_path), 'w') as file:
-            file.write(new_content)
-    subprocess.run(['git', '-C', CLONE_DIR, 'add', '.'])
-    subprocess.run(['git', '-C', CLONE_DIR, 'commit', '-m', 'Applied changes from OpenAI API'])
-    subprocess.run(['git', '-C', CLONE_DIR, 'push'])
+        update_file_on_github(file_path, new_content)
+    print('Changes applied and pushed to GitHub.')
+
+def update_file_on_github(file_path, new_content):
+    url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}'
+    headers = {
+        'Authorization': f'token {GITHUB_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    
+    # Get the SHA of the file to update it
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    sha = response.json()['sha']
+    
+    # Prepare the data for the commit
+    data = {
+        'message': 'Applied changes from OpenAI API',
+        'content': b64encode(new_content.encode()).decode(),
+        'sha': sha,
+        'branch': GITHUB_BRANCH
+    }
+    
+    # Push the commit
+    response = requests.put(url, json=data, headers=headers)
+    response.raise_for_status()
+    
+    print(f'Updated {file_path} successfully.')
 
 def retrieve_file_changes(answer):
     changes = {}
@@ -81,36 +109,6 @@ def retrieve_file_changes(answer):
     
     return changes
 
-def setup_ssh_key():
-    # Decode the base64 private key
-    private_key = b64decode(os.environ['GIT_PRIVATE_KEY']).decode('utf-8')
-    
-    # Write the private key to a file
-    ssh_dir = os.path.expanduser('~/.ssh')
-    os.makedirs(ssh_dir, exist_ok=True)
-    key_path = os.path.join(ssh_dir, 'id_rsa')
-    with open(key_path, 'w') as key_file:
-        key_file.write(private_key)
-    
-    # Secure the key file
-    os.chmod(key_path, 0o600)
-    
-    # Start the SSH agent
-    agent_process = subprocess.run(['ssh-agent', '-s'], check=True, text=True, capture_output=True)
-    
-    # Extract and set SSH_AUTH_SOCK and SSH_AGENT_PID from the ssh-agent output
-    agent_output = agent_process.stdout
-    for line in agent_output.splitlines():
-        if line.startswith('SSH_AUTH_SOCK'):
-            os.environ['SSH_AUTH_SOCK'] = line.split('=')[1].strip(' ;')
-        elif line.startswith('SSH_AGENT_PID'):
-            os.environ['SSH_AGENT_PID'] = line.split('=')[1].strip(' ;')
-
-    try:
-        # Add the private key to the agent
-        subprocess.run(['ssh-add', key_path], check=True)
-    except subprocess.CalledProcessError as e:
-        logger.error(f'Error adding SSH key to agent: {e}')
 
 @app.route('/')
 def index():
@@ -166,10 +164,6 @@ def concatenate_files_content(dir_path):
     return '\n'.join(concatenated_content)
 
 def main():
-    setup_ssh_key()
-    subprocess.run(['git', 'config', '--global', 'user.email', '44832123+Janldeboer@users.noreply.github.com'])
-    subprocess.run(['git', 'config', '--global', 'user.name', 'Jan de Boer (AI)'])
-    
     if not os.path.exists(CLONE_DIR):
         os.makedirs(CLONE_DIR, exist_ok=True)
         subprocess.run(['git', 'clone', REPO_URL, CLONE_DIR])
