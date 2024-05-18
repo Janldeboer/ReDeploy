@@ -3,6 +3,7 @@ import os
 import subprocess
 import requests
 import logging
+import urllib.parse
 from base64 import b64decode, b64encode
 from openai import OpenAI
 
@@ -68,25 +69,32 @@ def apply_answer_to_git(answer):
     print('Changes applied and pushed to GitHub.')
 
 def update_file_on_github(file_path, new_content):
-    url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}'
+    url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{urllib.parse.quote(file_path)}'
     headers = {
         'Authorization': f'token {GITHUB_TOKEN}',
         'Accept': 'application/vnd.github.v3+json'
     }
     
-    # Get the SHA of the file to update it
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    sha = response.json()['sha']
-    
+    try:
+        # Get the SHA of the file to update it
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        sha = response.json()['sha']
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            sha = None
+        else:
+            raise
+
     # Prepare the data for the commit
     data = {
-        'message': 'Applied changes from OpenAI API',
+        'message': 'AI generated changes',
         'content': b64encode(new_content.encode()).decode(),
-        'sha': sha,
         'branch': GITHUB_BRANCH
     }
-    
+    if sha:
+        data['sha'] = sha
+
     # Push the commit
     response = requests.put(url, json=data, headers=headers)
     response.raise_for_status()
