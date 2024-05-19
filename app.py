@@ -66,7 +66,7 @@ def apply_answer_to_git(answer):
     changes = retrieve_file_changes(answer)
     for file_path, new_content in changes.items():
         update_file_on_github(file_path, new_content)
-    print('Changes applied and pushed to GitHub.')
+    logger.info('Changes applied and pushed to GitHub.')
 
 def update_file_on_github(file_path, new_content):
     url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{urllib.parse.quote(file_path)}'
@@ -84,7 +84,7 @@ def update_file_on_github(file_path, new_content):
         if e.response.status_code == 404:
             sha = None
         else:
-            raise
+            logger.error(f'Error getting file SHA: {e}')
 
     # Prepare the data for the commit
     data = {
@@ -99,7 +99,7 @@ def update_file_on_github(file_path, new_content):
     response = requests.put(url, json=data, headers=headers)
     response.raise_for_status()
     
-    print(f'Updated {file_path} successfully.')
+    logger.info(f'Updated {file_path} successfully.')
 
 def retrieve_file_changes(answer):
     changes = {}
