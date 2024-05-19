@@ -1,10 +1,10 @@
-from flask import Flask, request, render_template, redirect, url_for, send_from_directory
+from flask import Flask, request, render_template, redirect, url_for
 import os
 import subprocess
 import requests
 import logging
 import urllib.parse
-from base64 import b64decode, b64encode
+from base64 import b64encode
 from openai import OpenAI
 
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
@@ -119,29 +119,6 @@ def submit():
     answer = call_openai_api(prompt)
     apply_answer_to_git(answer)
     return redirect(url_for('index'))
-
-
-@app.route('/fetch_repo')
-def fetch_repo():
-    if os.path.exists(CLONE_DIR):
-        subprocess.run(['rm', '-rf', CLONE_DIR])
-    subprocess.run(['git', 'clone', REPO_URL, CLONE_DIR])
-    return redirect(url_for('view_repo'))
-
-
-@app.route('/view_repo')
-def view_repo():
-    if not os.path.exists(CLONE_DIR):
-        return "Repository not cloned yet. Please fetch the repository first."
-    
-    files = os.listdir(CLONE_DIR)
-    combined = concatenate_files_content(CLONE_DIR)
-    return render_template('view_repo.html', files=files, combined=combined)
-
-
-@app.route('/cloned_repo/<path:filename>')
-def serve_file(filename):
-    return send_from_directory(CLONE_DIR, filename)
 
 def concatenate_files_content(dir_path):
     concatenated_content = []
