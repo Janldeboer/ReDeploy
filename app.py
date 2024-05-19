@@ -6,6 +6,7 @@ import logging
 import urllib.parse
 from base64 import b64encode
 from openai import OpenAI
+import patch
 
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 GITHUB_REPO = 'Janldeboer/ReDeploy'
@@ -48,9 +49,17 @@ def call_openai_api(prompt):
     
 def apply_answer_to_git(answer):
     changes = retrieve_file_changes(answer)
-    for file_path, new_content in changes.items():
-        update_file_on_github(file_path, new_content)
+    for file_path, patch_content in changes.items():
+        apply_patch_to_file(file_path, patch_content)
     logger.info('Changes applied and pushed to GitHub.')
+
+def apply_patch_to_file(file_path, patch_content):
+    patch_set = patch.fromstring(patch_content)
+    if patch_set.apply():
+        logger.info(f'Patch applied successfully to {file_path}.')
+        update_file_on_github(file_path, patch_content)
+    else:
+        logger.error(f'Failed to apply patch to {file_path}.')
 
 def update_file_on_github(file_path, new_content):
     url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{urllib.parse.quote(file_path)}'
@@ -69,6 +78,7 @@ def update_file_on_github(file_path, new_content):
             sha = None
         else:
             logger.error(f'Error getting file SHA: {e}')
+            return
 
     # Prepare the data for the commit
     data = {
@@ -88,23 +98,23 @@ def update_file_on_github(file_path, new_content):
 def retrieve_file_changes(answer):
     changes = {}
     lines = answer.split('\n')
-    file_path = None
-    content = []
-    in_code_block = False
+    patch_content = []
+    in_patch_block = False
     
     for line in lines:
-        if line.startswith('```') and not in_code_block:
-            in_code_block = True
-            file_path = line[3:].strip()
-            content = []
-        elif line.startswith('```') and in_code_block:
-            in_code_block = False
-            changes[file_path] = '\n'.join(content)
-        elif in_code_block:
-            content.append(line)
+        if line.startswith('diff --git'):
+            if in_patch_block:
+                changes[file_path] = '\n'.join(patch_content)
+            in_patch_block = True
+            patch_content = [line]
+            file_path = line.split(' ')[2][2:]  # Extract the file path from the diff line
+        elif in_patch_block:
+            patch_content.append(line)
+    
+    if in_patch_block:
+        changes[file_path] = '\n'.join(patch_content)
     
     return changes
-
 
 @app.route('/')
 def index():
